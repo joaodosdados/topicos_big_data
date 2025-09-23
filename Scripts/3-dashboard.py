@@ -1,8 +1,9 @@
 import pandas as pd
 import streamlit as st
+import plotly.express as px
 
 st.set_page_config(page_title="Dashboard – Vendas (nomes exatos)", layout="wide")
-st.title("📈 Dashboard simples – vendas_preenchido (PT‑BR)")
+st.title("📈 Dashboard de Vendas")
 
 CSV_PATH = "data/vendas_preenchido.csv"
 
@@ -69,50 +70,70 @@ if "Tipo" in df_f.columns:
 
 # 5) KPIs
 st.subheader("KPIs")
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Linhas (vendas)", f"{len(df_f):,}")
-col2.metric("Receita (R$)", f"{df_f['Receita'].sum():,.2f}")
-col3.metric("Quantidade total", f"{df_f['Quantidade'].sum():,}")
-col4.metric("Lucro (R$)", f"{df_f['Lucro'].sum():,.2f}")
+kpi1, kpi2, kpi3 = st.columns(3)
+kpi4, kpi5, kpi6 = st.columns(3)
+
+receita_total = df_f["Receita"].sum()
+lucro_total = df_f["Lucro"].sum()
+qtd_total = df_f["Quantidade"].sum()
+num_vendas = len(df_f)
+
+kpi1.metric("Vendas realizadas", f"{num_vendas:,}")
+kpi2.metric("Receita Total (R$)", f"{receita_total:,.2f}")
+kpi3.metric(
+    "Ticket Médio (R$)",
+    f"{receita_total / num_vendas:,.2f}" if num_vendas > 0 else "N/A",
+)
+kpi4.metric("Itens Vendidos", f"{qtd_total:,}")
+kpi5.metric("Lucro Total (R$)", f"{lucro_total:,.2f}")
+kpi6.metric(
+    "Margem de Lucro (%)",
+    f"{(lucro_total / receita_total) * 100:,.2f}%" if receita_total > 0 else "N/A",
+)
+
 
 st.divider()
 
-# 6) Gráficos em grid 2x2 (nativos)
+# 6) Gráficos
+st.subheader("Análises Gráficas")
 A, B = st.columns(2)
 C, D = st.columns(2)
 
 with A:
-    st.markdown("### Receita por dia")
+    st.markdown("### Receita por Dia")
     if df_f["Dia"].notna().any():
-        ts = df_f.groupby("Dia", dropna=True)["Receita"].sum().reset_index()
-        st.line_chart(ts, x="Dia", y="Receita", use_container_width=True)
+        ts = df_f.groupby("Dia")["Receita"].sum().reset_index()
+        fig = px.line(ts, x="Dia", y="Receita", title="Receita Diária")
+        st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Sem datas válidas em 'Dia'.")
 
 with B:
-    st.markdown("### Top 10 Tipos por Receita")
-    top_tipo = (
-        df_f.groupby("Tipo")["Receita"]
-        .sum()
-        .sort_values(ascending=False)
-        .head(10)
-        .reset_index()
-    )
-    st.bar_chart(top_tipo, x="Tipo", y="Receita", use_container_width=True)
+    st.markdown("### Receita por Tipo de Produto")
+    por_tipo = df_f.groupby("Tipo")["Receita"].sum().sort_values(ascending=False).reset_index()
+    fig = px.bar(por_tipo, x="Tipo", y="Receita", title="Receita por Tipo")
+    st.plotly_chart(fig, use_container_width=True)
 
 with C:
     st.markdown("### Receita por Loja")
     por_loja = df_f.groupby("Loja")["Receita"].sum().reset_index()
-    st.bar_chart(por_loja, x="Loja", y="Receita", use_container_width=True)
+    fig = px.pie(por_loja, names="Loja", values="Receita", title="Participação da Receita por Loja")
+    st.plotly_chart(fig, use_container_width=True)
 
 with D:
-    st.markdown("### Dispersão – Valor de venda × Quantidade")
-    st.scatter_chart(
-        df_f.dropna(subset=["Valor de venda", "Quantidade"]),
-        x="Valor de venda",
-        y="Quantidade",
-        use_container_width=True,
+    st.markdown("### Receita por Tipo de Produto em cada Loja")
+    receita_loja_tipo = (
+        df_f.groupby(["Loja", "Tipo"])["Receita"].sum().reset_index()
     )
+    fig = px.bar(
+        receita_loja_tipo,
+        x="Loja",
+        y="Receita",
+        color="Tipo",
+        title="Receita por Tipo de Produto em cada Loja",
+        barmode="stack",
+    )
+    st.plotly_chart(fig, use_container_width=True)
 
 st.divider()
 
